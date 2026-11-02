@@ -62,7 +62,11 @@ def state(manager, song):
             "clips": [] if t.is_foldable else [_clip_info(c) for c in t.arrangement_clips],
         })
     cues = sorted(({"name": c.name, "time": c.time} for c in song.cue_points), key=lambda c: c["time"])
+    sel = song.view.selected_track
+    selected = next((i for i, t in enumerate(song.tracks) if t == sel), None)
     return {
+        "selected_track": selected,
+        "is_playing": song.is_playing,
         "tempo": song.tempo,
         "signature": [song.signature_numerator, song.signature_denominator],
         "song_length": song.song_length,
@@ -290,8 +294,13 @@ def _arrange_undo_job(manager, song):
     if not hist:
         raise RuntimeError("no arranger action to undo")
     last = hist[-1]
-    if _snapshot(song) != last["after"]:
-        raise RuntimeError("the set changed since the last arranger action; use Cmd+Z in Live instead")
+    now = _snapshot(song)
+    if now != last["after"]:
+        changed = [song.tracks[i].name for i, (a, b) in enumerate(zip(now[0], last["after"][0])) if a != b]
+        if now[1] != last["after"][1]:
+            changed.append("locators")
+        raise RuntimeError("the set changed since the last arranger action (%s); use Cmd+Z in Live instead"
+                           % ", ".join(changed or ["track list"]))
     playhead = song.current_song_time
     steps = yield from _undo_until(song, last["before"])
     hist.pop()
@@ -354,7 +363,20 @@ def diag_cues(manager, song):
     return out
 
 
+def select_track(manager, song, track):
+    song.view.selected_track = song.tracks[track]
+    return track
+
+
+def message(manager, song, text):
+    """Show text in Live's status bar."""
+    manager.show_message(str(text)[:200])
+    return "ok"
+
+
 COMMANDS = {
+    "select_track": select_track,
+    "message": message,
     "diag_cues": diag_cues,
     "apply_plan": apply_plan,
     "job_status": job_status,

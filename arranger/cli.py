@@ -17,6 +17,7 @@ import sys
 from .client import LiveClient, LiveError
 from .model import EPS, Arrangement
 from .planner import PlanError, describe, plan_copy, plan_move
+from .runner import automation_warnings, execute
 from .simulate import apply
 
 
@@ -61,20 +62,6 @@ def cmd_undo(arr, args, client):
     print("undone (%d Live undo steps)" % res["undo_steps"])
 
 
-def _verify(client, tracks, expected: Arrangement):
-    actual = Arrangement.from_state(client.call("state"))
-    problems = []
-    for ti in tracks:
-        exp = [(round(c.start, 3), round(c.end, 3), round(c.loop_start, 3)) for c in expected.tracks[ti].clips]
-        got = [(round(c.start, 3), round(c.end, 3), round(c.loop_start, 3)) for c in actual.tracks[ti].clips]
-        if exp != got:
-            problems.append("track %s: expected %s, got %s" % (actual.tracks[ti].name, exp, got))
-    cues = lambda a: [(c.name, round(c.time, 3)) for c in a.cues]
-    if cues(expected) != cues(actual):
-        problems.append("locators: expected %s, got %s" % (cues(expected), cues(actual)))
-    return problems
-
-
 def cmd_edit(arr, args, client):
     tracks = resolve_tracks(arr, args.tracks)
     if args.command == "move":
@@ -82,16 +69,15 @@ def cmd_edit(arr, args, client):
     else:
         plan = plan_copy(arr, tracks, args.name, after=args.after, before=args.before, new_name=args.new_name)
     print(describe(arr, plan, [arr.tracks[i].name for i in tracks]))
-    for name, params in client.call("automation_report", tracks=tracks):
-        print("warning: %s has automation (%s) that will NOT move" % (name, ", ".join(params)))
+    for w in automation_warnings(client, tracks):
+        print("warning: " + w)
     if not plan.ops or args.dry_run:
         return
-    expected = apply(arr, plan, strict=True)  # refuse anything that would overwrite
+    apply(arr, plan, strict=True)  # refuse anything that would overwrite, before asking
     if not args.yes and input("apply? [y/N] ").strip().lower() != "y":
         print("cancelled")
         return
-    print("applied:", client.run_job("apply_plan", **plan.to_json()))
-    problems = _verify(client, tracks, expected)
+    problems = execute(client, arr, plan)
     if problems:
         print("VERIFY FAILED (try `python3 -m arranger undo`):\n  " + "\n  ".join(problems))
         sys.exit(2)

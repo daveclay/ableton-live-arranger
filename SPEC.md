@@ -57,6 +57,25 @@ owns the APC completely.
   toggle tracks; picked tracks shown lit on the grid.
 - Exact button mapping: TBD.
 
+### APC40 mkII MIDI map (measured, Ableton Live mode via SysEx 0x41)
+Channels below are 0-based (mido). Buttons send note_on 127 / note_off.
+| Control | Message |
+|---|---|
+| Clip pads 8×5 | note 0–39, ch 0 (0 = bottom-left row) |
+| Track select (8) | note 51, ch = track 0–7 |
+| Clip stop (8) | note 52, ch = track 0–7 |
+| Scene launch (5) | note 82–86, top → bottom |
+| Shift | note 98 (press + release, so holdable) |
+| Bank ▲ ▼ ◄ ► | note 94, 95, 97, 96 |
+| Device-section buttons | note 58–65 |
+| Cue Level encoder | CC 47, relative: 1–63 = +n, 65–127 = −(128−n) |
+| Top 8 knobs | CC 48–55, absolute |
+| Device 8 knobs | CC 16–23, absolute (CC 16 on this unit jitters — don't use) |
+| Faders | CC 7 ch = track; master CC 14; crossfader CC 15 |
+
+Live MIDI prefs: APC40 mkII ports must have Track/Sync/Remote off and no
+Control Surface slot using them.
+
 ## Architecture
 - **External Python 3 process.**
   - Reads/writes the APC via MIDI (`mido` + `python-rtmidi`), including LED feedback.
