@@ -106,6 +106,7 @@ the LEDs off. Messages appear in the terminal and in Live's status bar.
 | Shift + Device On/Off | Clear all picks |
 | Clip pads | One pad per section in song order, 8 per row starting at the top-left |
 | Device ◄ | Undo the last move or copy |
+| Device Lock | Add a locator at the playhead (Shift: remove the one there) |
 
 To use the pads:
 - Tap a section to pick it up. It turns white.

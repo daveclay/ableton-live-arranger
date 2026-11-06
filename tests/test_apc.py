@@ -24,6 +24,12 @@ class FakeClient:
             return []
         return "ok"
 
+    def run_job(self, cmd, **args):
+        self.calls.append((cmd, args))
+        if cmd == "locator_at_playhead":
+            return {"done": True, "name": "1" if args["add"] else None, "time": 16.0}
+        return {}
+
 
 def make():
     sent = []
@@ -92,6 +98,18 @@ class TestTransport(unittest.TestCase):
         ctl.flush()  # nothing pending
         nudges = [a for c, a in ctl.client.calls if c == "nudge_playhead"]
         self.assertEqual(nudges, [{"steps": 4, "unit": "bar"}, {"steps": -2, "unit": "sixteenth"}])
+
+
+class TestLocator(unittest.TestCase):
+    def test_add_and_shift_remove(self):
+        ctl, _ = make()
+        ctl.ask_name = lambda default, bar: "verse"
+        ctl.handle("note_on", 0, apc.MAP["locator"], 127)
+        ctl.handle("note_on", 0, apc.MAP["shift"], 127)
+        ctl.handle("note_on", 0, apc.MAP["locator"], 127)
+        calls = [a for c, a in ctl.client.calls if c == "locator_at_playhead"]
+        self.assertEqual(calls, [{"add": True}, {"add": False}])
+        self.assertIn(("rename_locator", {"time": 16.0, "name": "verse"}), ctl.client.calls)
 
 
 class TestEdits(unittest.TestCase):

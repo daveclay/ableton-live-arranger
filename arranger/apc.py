@@ -14,6 +14,7 @@ Controls (edit the MAP below to change them):
                           tap the dim pad after the last section to put it at the end,
                           tap the picked-up section again to cancel
   Device ◄              undo the last move/copy
+  Device Lock           add a locator at the playhead   (Shift: remove the one there)
   Tempo knob            move the playhead by bars (Shift: by 16th notes)
 Clip-stop lights show the cursor; track-select lights show picked tracks.
 Messages appear in Live's status bar.
@@ -21,6 +22,7 @@ Messages appear in Live's status bar.
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import time
 from typing import Callable, Dict, List, Optional, Set, Tuple
@@ -41,6 +43,7 @@ MAP = {
     "shift": 98,
     "toggle_cursor": 62,  # Device On/Off
     "undo": 58,           # Device ◄
+    "locator": 63,        # Device Lock
     "cursor_knob": 47,    # CC, relative
     "transport_knob": 13, # Tempo knob, CC, relative
 }
@@ -194,6 +197,40 @@ class Controller:
         finally:
             self.refresh()
 
+    def locator(self, add):
+        self.flush()  # land any knob turn first
+        try:
+            res = self.client.run_job("locator_at_playhead", add=add)
+        except LiveError as e:
+            self.say("locator: %s" % e)
+            return
+        bar = "bar %g" % round(self.arr.bar_of(res["time"]), 2)
+        if res["done"] and add:
+            name = self.ask_name(res["name"], bar)
+            if name and name != res["name"]:
+                try:
+                    res["name"] = self.client.call("rename_locator", time=res["time"], name=name)
+                except LiveError as e:
+                    self.log("couldn't rename: %s" % e)
+            self.say("added locator %s at %s" % (res["name"], bar))
+        elif res["done"]:
+            self.say("removed locator at " + bar)
+        else:
+            self.say(("locator %s is already at %s" % (res["name"], bar)) if add else "no locator at " + bar)
+        self.refresh()
+
+    def ask_name(self, default, bar):
+        """Pop up a macOS text box for the new locator's name; None if cancelled."""
+        script = ('activate\n'
+                  'display dialog "Name the locator at %s" default answer "%s" '
+                  'with title "Arranger"\n'
+                  'text returned of result' % (bar, default.replace('"', '')))
+        try:
+            out = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=300)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        return out.stdout.strip() if out.returncode == 0 else None
+
     def undo(self):
         try:
             res = self.client.run_job("arrange_undo")
@@ -228,6 +265,8 @@ class Controller:
                     self.say("cleared picks")
                 else:
                     self.toggle_track(self.cursor)
+            elif number == MAP["locator"]:
+                self.locator(add=not self.shift)
             elif number == MAP["undo"]:
                 self.undo()
                 self.refresh()

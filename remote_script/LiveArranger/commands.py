@@ -32,6 +32,8 @@ def probe(manager, song):
         "Track": _public(Live.Track.Track),
         "Clip": _public(Live.Clip.Clip),
         "CuePoint": _public(Live.Song.CuePoint),
+        "Song.View": _public(Live.Song.Song.View),
+        "Application.View": _public(Live.Application.Application.View),
     }
 
 
@@ -395,6 +397,38 @@ def nudge_playhead(manager, song, steps, unit="bar"):
     return new
 
 
+def _locator_job(manager, song, add):
+    t = song.current_song_time
+    target = getattr(manager, "_playhead_target", None)
+    if not song.is_playing and target is not None and abs(t - target) > TOL:
+        yield from _seek(song, target)  # a knob move hasn't landed yet
+        t = target
+    cue = _cue_at(song, t)
+    if add and cue is not None:
+        return {"done": False, "name": cue.name, "time": t}
+    if not add and cue is None:
+        return {"done": False, "name": None, "time": t}
+    song.set_or_delete_cue()  # toggles a locator at the playhead
+    yield
+    cue = _cue_at(song, t)
+    if (cue is None) == add:
+        raise RuntimeError("couldn't %s the locator at %.4f" % ("add" if add else "remove", t))
+    return {"done": True, "name": cue.name if cue else None, "time": t}
+
+
+def locator_at_playhead(manager, song, add=True):
+    """Add (or remove) a locator at the playhead. Never toggles the other way."""
+    return {"job": _start_job(manager, _locator_job(manager, song, add))}
+
+
+def rename_locator(manager, song, time, name):
+    cue = _cue_at(song, time)
+    if cue is None:
+        raise LookupError("no locator at %.4f" % time)
+    cue.name = str(name)
+    return cue.name
+
+
 def message(manager, song, text):
     """Show text in Live's status bar."""
     manager.show_message(str(text)[:200])
@@ -405,6 +439,8 @@ COMMANDS = {
     "select_track": select_track,
     "message": message,
     "nudge_playhead": nudge_playhead,
+    "locator_at_playhead": locator_at_playhead,
+    "rename_locator": rename_locator,
     "diag_cues": diag_cues,
     "apply_plan": apply_plan,
     "job_status": job_status,
