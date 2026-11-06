@@ -127,13 +127,20 @@ class Controller:
         names = [self.arr.tracks[i].name for i in self.pick_list()]
         self.say("picked: " + (", ".join(names) or "none"))
 
+    def select(self, ti):
+        """Move the cursor to track ti and select it in Live."""
+        self.cursor = ti
+        try:
+            self.client.call("select_track", track=ti)
+        except LiveError as e:
+            self.log("can't select track: %s" % e)
+
     def move_cursor(self, delta):
         n = len(self.arr.tracks)
         new = max(0, min(n - 1, self.cursor + delta))
         if new != self.cursor:
-            self.cursor = new
             self.bank = (new // COLS) * COLS
-            self.client.call("select_track", track=new)
+            self.select(new)
 
     # ---- sections -----------------------------------------------------------
     def press_pad(self, slot):
@@ -201,7 +208,10 @@ class Controller:
             if number < ROWS * COLS and channel == 0:
                 self.press_pad(pad_index(number))
             elif number == MAP["track_select"]:
-                self.toggle_track(self.bank + channel)
+                ti = self.bank + channel
+                if ti < len(self.arr.tracks):
+                    self.select(ti)  # show it in Live so you can see which track it is
+                    self.toggle_track(ti)
             elif number == MAP["bank_left"]:
                 self.bank = max(0, self.bank - COLS)
             elif number == MAP["bank_right"]:

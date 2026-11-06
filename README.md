@@ -98,7 +98,7 @@ the LEDs off. Messages appear in the terminal and in Live's status bar.
 
 | Control | Action |
 |---|---|
-| Track select 1–8 | Pick or unpick that track (a group picks all its tracks). Lit = picked |
+| Track select 1–8 | Select that track in Live, and pick or unpick it (a group picks all its tracks). Lit = picked |
 | Bank ◄ / ► | Previous / next 8 tracks |
 | Cue Level knob | Move the track cursor (shown on the clip-stop lights; Live's selected track follows) |
 | Device On/Off | Pick or unpick the cursor's track |

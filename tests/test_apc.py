@@ -53,6 +53,13 @@ class TestTracks(unittest.TestCase):
         ctl.handle("note_on", 0, apc.MAP["track_select"], 127)
         self.assertEqual(ctl.pick_list(), [])
 
+    def test_track_select_selects_in_live(self):
+        ctl, _ = make()
+        ctl.handle("note_on", 7, apc.MAP["track_select"], 127)  # column 7, a plain track
+        self.assertEqual(ctl.cursor, 7)
+        self.assertIn(("select_track", {"track": 7}), ctl.client.calls)
+        self.assertEqual(ctl.pick_list(), [7])
+
     def test_knob_moves_cursor_and_selects_in_live(self):
         ctl, _ = make()
         for _ in range(4):
