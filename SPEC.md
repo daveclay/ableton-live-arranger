@@ -69,6 +69,7 @@ Channels below are 0-based (mido). Buttons send note_on 127 / note_off.
 | Bank ▲ ▼ ◄ ► | note 94, 95, 97, 96 |
 | Device-section buttons | note 58–65 |
 | Cue Level encoder | CC 47, relative: 1–63 = +n, 65–127 = −(128−n) |
+| Tempo encoder | CC 13, relative, same encoding (1 / 127 per click, 126 on fast turns) |
 | Top 8 knobs | CC 48–55, absolute |
 | Device 8 knobs | CC 16–23, absolute (CC 16 on this unit jitters — don't use) |
 | Faders | CC 7 ch = track; master CC 14; crossfader CC 15 |

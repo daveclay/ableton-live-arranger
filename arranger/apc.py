@@ -14,6 +14,7 @@ Controls (edit the MAP below to change them):
                           tap the dim pad after the last section to put it at the end,
                           tap the picked-up section again to cancel
   Device ◄              undo the last move/copy
+  Tempo knob            move the playhead by bars (Shift: by 16th notes)
 Clip-stop lights show the cursor; track-select lights show picked tracks.
 Messages appear in Live's status bar.
 """
@@ -41,8 +42,10 @@ MAP = {
     "toggle_cursor": 62,  # Device On/Off
     "undo": 58,           # Device ◄
     "cursor_knob": 47,    # CC, relative
+    "transport_knob": 13, # Tempo knob, CC, relative
 }
 KNOB_STEP = 2  # knob ticks per track step (raise to make the cursor slower)
+TRANSPORT_STEP = 1  # knob ticks per step (bar; with Shift a 16th note)
 
 # APC40 mkII pad colour palette (velocity values).
 OFF, DIM, WHITE = 0, 1, 3
@@ -76,6 +79,8 @@ class Controller:
         self.shift = False
         self.held: Optional[int] = None  # picked-up section index
         self.knob_acc = 0
+        self.transport_acc = 0
+        self.pending_nudge: Dict[str, int] = {}  # unit -> steps, sent by flush()
         self.leds: Dict[Tuple[str, int, int], int] = {}
 
     # ---- Live state -------------------------------------------------------
@@ -234,9 +239,30 @@ class Controller:
             if steps:
                 self.knob_acc -= steps * KNOB_STEP
                 self.move_cursor(steps)
+        elif kind == "cc" and number == MAP["transport_knob"]:
+            self.transport_acc += value if value < 64 else value - 128
+            steps = int(self.transport_acc / TRANSPORT_STEP)
+            if steps:
+                self.transport_acc -= steps * TRANSPORT_STEP
+                unit = "sixteenth" if self.shift else "bar"
+                self.pending_nudge[unit] = self.pending_nudge.get(unit, 0) + steps
+            return
         else:
             return
         self.render()
+
+    def flush(self):
+        """Send knob turns collected since the last flush as one playhead move.
+
+        Each call to Live waits for its next tick (~100 ms), so sending every
+        click separately made the playhead lag behind the knob."""
+        pending, self.pending_nudge = self.pending_nudge, {}
+        for unit, steps in pending.items():
+            if steps:
+                try:
+                    self.client.call("nudge_playhead", steps=steps, unit=unit)
+                except LiveError as e:
+                    self.log("can't move playhead: %s" % e)
 
     # ---- LEDs ---------------------------------------------------------------
     def led(self, kind, channel, number, value):
@@ -306,6 +332,7 @@ def main():
                     ctl.handle("note_on", msg.channel, msg.note, 0 if msg.type == "note_off" else msg.velocity)
                 elif msg.type == "control_change":
                     ctl.handle("cc", msg.channel, msg.control, msg.value)
+            ctl.flush()
             if time.monotonic() - last_refresh > 1.0:
                 ctl.refresh()
                 last_refresh = time.monotonic()

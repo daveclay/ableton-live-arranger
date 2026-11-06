@@ -79,6 +79,21 @@ class TestTracks(unittest.TestCase):
         self.assertEqual(ctl.pick_list(), [])
 
 
+class TestTransport(unittest.TestCase):
+    def test_tempo_knob_nudges_playhead(self):
+        ctl, _ = make()
+        for _ in range(5):
+            ctl.handle("cc", 0, apc.MAP["transport_knob"], 1)
+        ctl.handle("cc", 0, apc.MAP["transport_knob"], 127)
+        ctl.flush()  # five clicks forward, one back -> one call
+        ctl.handle("note_on", 0, apc.MAP["shift"], 127)
+        ctl.handle("cc", 0, apc.MAP["transport_knob"], 126)  # -2, with Shift
+        ctl.flush()
+        ctl.flush()  # nothing pending
+        nudges = [a for c, a in ctl.client.calls if c == "nudge_playhead"]
+        self.assertEqual(nudges, [{"steps": 4, "unit": "bar"}, {"steps": -2, "unit": "sixteenth"}])
+
+
 class TestEdits(unittest.TestCase):
     def press(self, ctl, slot):
         ctl.handle("note_on", 0, pad_note(slot), 127)

@@ -101,6 +101,7 @@ the LEDs off. Messages appear in the terminal and in Live's status bar.
 | Track select 1–8 | Select that track in Live, and pick or unpick it (a group picks all its tracks). Lit = picked |
 | Bank ◄ / ► | Previous / next 8 tracks |
 | Cue Level knob | Move the track cursor (shown on the clip-stop lights; Live's selected track follows) |
+| Tempo knob | Move the playhead by bars, snapping to the bar (Shift: by 16th notes) |
 | Device On/Off | Pick or unpick the cursor's track |
 | Shift + Device On/Off | Clear all picks |
 | Clip pads | One pad per section in song order, 8 per row starting at the top-left |

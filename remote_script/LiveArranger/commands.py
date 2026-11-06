@@ -3,6 +3,8 @@
 Times are in beats (Live's native arrangement unit).
 """
 
+import math
+
 import Live
 
 # Only fixed, named commands are exposed — no arbitrary code execution.
@@ -67,6 +69,8 @@ def state(manager, song):
     return {
         "selected_track": selected,
         "is_playing": song.is_playing,
+        "song_time": song.current_song_time,
+        "start_time": song.start_time,
         "tempo": song.tempo,
         "signature": [song.signature_numerator, song.signature_denominator],
         "song_length": song.song_length,
@@ -368,6 +372,29 @@ def select_track(manager, song, track):
     return track
 
 
+def nudge_playhead(manager, song, steps, unit="bar"):
+    """Move the playhead by `steps` bars, beats or sixteenths, snapping to that grid.
+
+    current_song_time only updates on a later tick, so fast knob turns build on
+    the last target we set rather than the stale reading."""
+    beats = song.signature_numerator * 4.0 / song.signature_denominator
+    beat = 4.0 / song.signature_denominator
+    size = {"bar": beats, "beat": beat, "sixteenth": 0.25}[unit]
+    base = song.current_song_time
+    target = getattr(manager, "_playhead_target", None)
+    if target is not None and abs(base - target) > TOL:
+        base = target
+    grid = base / size
+    # Snap to the grid in the direction of travel, then step.
+    cell = math.floor(grid + TOL) if steps > 0 else math.ceil(grid - TOL)
+    new = max(0.0, min((cell + steps) * size, song.song_length))
+    manager._playhead_target = new
+    song.current_song_time = new
+    # Play starts from the start marker, not the playhead; move it too.
+    song.start_time = new
+    return new
+
+
 def message(manager, song, text):
     """Show text in Live's status bar."""
     manager.show_message(str(text)[:200])
@@ -377,6 +404,7 @@ def message(manager, song, text):
 COMMANDS = {
     "select_track": select_track,
     "message": message,
+    "nudge_playhead": nudge_playhead,
     "diag_cues": diag_cues,
     "apply_plan": apply_plan,
     "job_status": job_status,
