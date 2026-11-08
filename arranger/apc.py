@@ -356,24 +356,33 @@ def main():
                  else mido.Message("control_change", channel=ch, control=num, value=val))
 
     out.send(mido.Message("sysex", data=SYSEX_ABLETON_MODE))
-    try:
-        client = LiveClient()
-    except ConnectionRefusedError:
-        sys.exit("can't reach LiveArranger in Live (is it selected as a Control Surface?)")
+    client = connect()
     ctl = Controller(client, send)
     ctl.refresh()
     ctl.say("APC ready — %d sections" % len(ctl.sections()))
     last_refresh = time.monotonic()
     try:
         while True:
-            for msg in inp.iter_pending():
-                if msg.type in ("note_on", "note_off"):
-                    ctl.handle("note_on", msg.channel, msg.note, 0 if msg.type == "note_off" else msg.velocity)
-                elif msg.type == "control_change":
-                    ctl.handle("cc", msg.channel, msg.control, msg.value)
-            ctl.flush()
-            if time.monotonic() - last_refresh > 1.0:
+            try:
+                for msg in inp.iter_pending():
+                    if msg.type in ("note_on", "note_off"):
+                        ctl.handle("note_on", msg.channel, msg.note, 0 if msg.type == "note_off" else msg.velocity)
+                    elif msg.type == "control_change":
+                        ctl.handle("cc", msg.channel, msg.control, msg.value)
+                ctl.flush()
+                if time.monotonic() - last_refresh > 1.0:
+                    ctl.refresh()
+                    last_refresh = time.monotonic()
+            except OSError as e:  # Live quit, reloaded the set, or dropped the socket
+                print("lost Live (%s); reconnecting…" % e, flush=True)
+                ctl.all_off()  # dark pads = not connected
+                client.close()
+                client = ctl.client = connect()
+                for _ in inp.iter_pending():
+                    pass  # drop presses made while disconnected
+                ctl.held, ctl.pending_nudge = None, {}
                 ctl.refresh()
+                ctl.say("APC reconnected — %d sections" % len(ctl.sections()))
                 last_refresh = time.monotonic()
             time.sleep(0.005)
     except KeyboardInterrupt:
@@ -384,6 +393,20 @@ def main():
         inp.close()
         out.close()
 
+
+def connect():
+    """Connect to LiveArranger in Live, waiting until it's there."""
+    waiting = False
+    while True:
+        try:
+            client = LiveClient()
+            client.call("ping")
+            return client
+        except OSError:
+            if not waiting:
+                print("waiting for LiveArranger in Live…", flush=True)
+                waiting = True
+            time.sleep(1.0)
 
 if __name__ == "__main__":
     main()
