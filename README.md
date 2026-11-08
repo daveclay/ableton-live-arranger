@@ -6,6 +6,31 @@ or from an Akai APC40 mkII. See [SPEC.md](SPEC.md) for the design.
 
 A **section** runs from one locator to the next and takes the locator's name.
 
+## Every session
+
+1. Turn on the APC40 mkII (on a data USB cable) and the audio interface.
+2. Open Live and your set. LiveArranger stays selected as a Control Surface
+   from last time, so there's nothing to do in Live's settings.
+3. Start the APC controller. Either double-click `scripts/apc.command` in
+   Finder, or run:
+
+       cd ~/code/ableton-live-arranger
+       .venv/bin/python -m arranger.apc
+
+   Leave that window open while you work. You'll see
+   `APC ready — N sections`, and the pads light up, one per section.
+4. When you're done, press Ctrl+C or close the window. The APC goes dark.
+
+Notes:
+- Starting the controller before Live is fine; it waits for Live.
+- If Live restarts or you reopen the set, the controller reconnects on its own.
+- **Lit but not responding?** The controller isn't running (or it was stopped
+  without Ctrl+C). Start it again.
+- **Dark?** The controller is waiting for Live, or isn't running.
+- Picks are forgotten when the controller restarts; pick the tracks again.
+
+For the controls, see [APC40 mkII](#apc40-mkii) below.
+
 ## Setup (once)
 
 1. Install the Remote Script into Live's User Library:
